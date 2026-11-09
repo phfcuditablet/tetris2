@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f3dfbd">
+<title>Blocos de Madeira</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#f3dfbd;color:#5a2d12;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+background:linear-gradient(90deg,#f6e6c8,#efd6ab 50%,#f6e6c8)}
+@supports (height:100dvh){html,body{height:100dvh}}
+#top{display:flex;align-items:center;gap:18px;padding:8px 12px;height:84px}
+.st{display:flex;flex-direction:column;align-items:center;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.st b{font-size:24px;color:#b8602a}
+#nx{width:64px;height:64px;background:rgba(90,45,18,.08);border-radius:10px}
+#wrap{display:flex;flex-direction:column;gap:4px}
+#c{border:3px solid #5a2d12;border-radius:6px;background:linear-gradient(#f8ecd2,#ecd2a2);display:block;touch-action:none}
+#rise{height:6px;background:rgba(90,45,18,.18);border-radius:3px;overflow:hidden}
+#rb{display:block;height:100%;width:0;background:#b8602a}
+#ctl{display:flex;gap:10px;padding:12px;margin-top:auto}
+#ctl button{width:62px;height:62px;border:0;border-radius:16px;background:#b8602a;color:#fff;font-size:28px;box-shadow:0 4px 0 #7a3d17;cursor:pointer;touch-action:manipulation}
+#ctl button:active{transform:translateY(3px);box-shadow:0 1px 0 #7a3d17}
+#ov{position:fixed;inset:0;background:rgba(40,20,8,.65);display:flex;align-items:center;justify-content:center;z-index:5}
+#ov.hidden{display:none}
+#ov>div{background:#f6e6c8;padding:26px 34px;border-radius:18px;text-align:center;margin:16px}
+#ov button{font-size:20px;padding:10px 30px;border:0;border-radius:12px;background:#b8602a;color:#fff;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="top">
+  <div class="st">Pontos<b id="sc">0</b></div>
+  <div class="st">Nível<b id="lv">1</b></div>
+  <div class="st">Linhas<b id="ln">0</b></div>
+  <canvas id="nx" width="128" height="128"></canvas>
+</div>
+<div id="wrap"><canvas id="c"></canvas><div id="rise"><i id="rb"></i></div></div>
+<div id="ctl">
+  <button id="bl" aria-label="Esquerda">◀</button>
+  <button id="br" aria-label="Direita">▶</button>
+  <button id="bo" aria-label="Girar">⟳</button>
+  <button id="bd" aria-label="Descer">▼</button>
+  <button id="bh" aria-label="Soltar tudo">⏬</button>
+  <button id="bp" aria-label="Pausar">⏸</button>
+</div>
+<div id="ov"><div><h2 id="ot">Blocos de Madeira</h2><p id="op">A tela começa limpa e vai subindo devagar.<br>Complete linhas antes que ela chegue ao topo!</p><button id="ob">Jogar</button></div></div>
+<script>
+(function(){
+function $(s){return document.querySelector(s);}
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(e){return null;}}
+var W=10,H=20,cv=$('#c'),cx=cv.getContext('2d'),nv=$('#nx'),nc=nv.getContext('2d'),cell=28;
+var SH=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]]];
+var COL=['#e3a463','#d98c4f','#c9733a','#ebb273','#bf6a32','#d38544','#c4713a'];
+var g,cur,nextN,score,lines,level,over,busy,paused,started,nid,dropAcc,riseAcc,best=+store('blocos-best')||0;
+
+function empty(){var r=[];for(var y=0;y<H;y++){r.push(new Array(W).fill(0));}return r;}
+function rot(m){return m[0].map(function(_,i){return m.map(function(r){return r[i];}).reverse();});}
+function fits(m,x,y){
+  for(var j=0;j<m.length;j++)for(var i=0;i<m[j].length;i++)if(m[j][i]){
+    var a=x+i,b=y+j;if(a<0||a>=W||b>=H||(b>=0&&g[b][a]))return false;}
+  return true;
+}
+function dropMs(){return Math.max(110,800-(level-1)*55);}
+function riseMs(){return Math.max(5500,15000-(level-1)*600);}
+
+function reset(){
+  g=empty();score=0;lines=0;level=1;over=false;busy=false;paused=false;nid=0;dropAcc=0;riseAcc=0;
+  nextN=Math.floor(Math.random()*7);spawn();hud();
+}
+function spawn(){
+  var n=nextN;nextN=Math.floor(Math.random()*7);
+  var m=SH[n].map(function(r){return r.slice();});
+  cur={m:m,c:n,id:++nid,x:Math.floor((W-m[0].length)/2),y:0};
+  dropAcc=0;
+  if(!fits(m,cur.x,cur.y))fim();
+}
+function fim(){
+  over=true;if(score>best){best=score;store('blocos-best',best);}
+  overlay('Fim de jogo','Pontos: '+score+' · Recorde: '+best,'Jogar de novo');
+}
+function overlay(t,p,b){$('#ot').textContent=t;$('#op').textContent=p;$('#ob').textContent=b;$('#ov').classList.remove('hidden');}
+function hud(){$('#sc').textContent=score;$('#lv').textContent=level;$('#ln').textContent=lines;}
+
+function move(dx){if(!act())return;if(fits(cur.m,cur.x+dx,cur.y))cur.x+=dx;draw();}
+function turn(){if(!act())return;var r=rot(cur.m),k=[0,-1,1,-2,2];
+  for(var i=0;i<k.length;i++)if(fits(r,cur.x+k[i],cur.y)){cur.m=r;cur.x+=k[i];break;}draw();}
+function down(){if(!act())return;if(fits(cur.m,cur.x,cur.y+1)){cur.y++;score+=1;hud();}else lock();draw();}
+function hard(){if(!act())return;while(fits(cur.m,cur.x,cur.y+1)){cur.y++;score+=2;}hud();lock();draw();}
+function act(){return started&&!over&&!busy&&!paused;}
+
+function lock(){
+  for(var q=0;q<cur.m.length;q++)if(cur.y+q<0&&cur.m[q].some(function(v){return v;})){fim();return;}
+  for(var j=0;j<cur.m.length;j++)for(var i=0;i<cur.m[j].length;i++)if(cur.m[j][i])g[cur.y+j][cur.x+i]={id:cur.id,c:cur.c};
+  cur=null;busy=true;setTimeout(step,60);
+}
+// Depois de travar: pedaços soltos caem; linhas completas somem; repete até estabilizar
+function step(){
+  if(over)return;
+  if(settle()){draw();setTimeout(step,70);return;}
+  var full=[];for(var y=0;y<H;y++){if(g[y].every(function(c){return c;}))full.push(y);}
+  if(full.length){
+    var cut={};full.forEach(function(y){g[y].forEach(function(c){if(c)cut[c.id]=1;});});
+    full.forEach(function(y){g[y]=new Array(W).fill(0);});
+    // pedaços que sobraram das peças cortadas viram pedrinhas soltas: cada uma desce sozinha se tiver espaço
+    for(var yy=0;yy<H;yy++)for(var xx=0;xx<W;xx++){var q=g[yy][xx];if(q&&cut[q.id])g[yy][xx]={id:++nid,c:q.c};}
+    lines+=full.length;score+=[0,100,300,500,800][Math.min(full.length,4)]*level;
+    level=1+Math.floor(lines/8);hud();draw();setTimeout(step,220);return;
+  }
+  busy=false;if(!cur)spawn();draw();
+}
+// move 1 casa para baixo cada pedaço (grupo conectado da mesma peça) que tem espaço embaixo
+function settle(){
+  var seen={},comps=[],y,x;
+  for(y=0;y<H;y++)for(x=0;x<W;x++){
+    var c=g[y][x];if(!c||seen[x+','+y])continue;
+    var st=[[x,y]],list=[];seen[x+','+y]=1;
+    while(st.length){var p=st.pop();list.push(p);
+      [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){
+        var a=p[0]+d[0],b=p[1]+d[1];
+        if(a>=0&&b>=0&&a<W&&b<H&&g[b][a]&&g[b][a].id===c.id&&!seen[a+','+b]){seen[a+','+b]=1;st.push([a,b]);}});}
+    comps.push(list);
+  }
+  comps.sort(function(a,b){return Math.max.apply(null,b.map(function(p){return p[1];}))-Math.max.apply(null,a.map(function(p){return p[1];}));});
+  var moved=false;
+  comps.forEach(function(list){
+    var own={};list.forEach(function(p){own[p[0]+','+p[1]]=1;});
+    var ok=list.every(function(p){var b=p[1]+1;return b<H&&(!g[b][p[0]]||own[p[0]+','+b]);});
+    if(!ok)return;
+    var cells=list.map(function(p){return {x:p[0],y:p[1],v:g[p[1]][p[0]]};});
+    cells.forEach(function(o){g[o.y][o.x]=0;});cells.forEach(function(o){g[o.y+1][o.x]=o.v;});moved=true;
+  });
+  return moved;
+}
+// a tela sobe: nova fileira (com buracos) entra por baixo
+function rise(){
+  if(g[0].some(function(c){return c;})){fim();return;}
+  g.shift();var row=new Array(W).fill(0),holes=1+Math.floor(Math.random()*3),hs={};
+  while(Object.keys(hs).length<holes)hs[Math.floor(Math.random()*W)]=1;
+  for(var x=0;x<W;x++)if(!hs[x])row[x]={id:++nid,c:Math.floor(Math.random()*7)};
+  g.push(row);
+  if(cur){while(!fits(cur.m,cur.x,cur.y)){cur.y--;if(cur.y<-1){fim();return;}}}
+  if(!busy){busy=true;setTimeout(step,60);} // peças sobre buracos caem
+}
+
+function block(t,px,py,s,c){
+  t.fillStyle=COL[c];t.fillRect(px,py,s,s);
+  t.fillStyle='rgba(255,255,255,.28)';t.fillRect(px,py,s,Math.max(2,s*.1));t.fillRect(px,py,Math.max(2,s*.1),s);
+  t.fillStyle='rgba(60,25,5,.25)';t.fillRect(px,py+s-Math.max(2,s*.1),s,Math.max(2,s*.1));t.fillRect(px+s-Math.max(2,s*.1),py,Math.max(2,s*.1),s);
+  t.strokeStyle='rgba(90,40,10,.2)';t.lineWidth=1;
+  t.beginPath();t.moveTo(px+s*(.25+c*.07),py);t.lineTo(px+s*(.3+c*.06),py+s);t.moveTo(px+s*(.62+c*.04),py);t.lineTo(px+s*(.66+c*.03),py+s);t.stroke();
+  t.strokeStyle='#5a2d12';t.strokeRect(px+.5,py+.5,s-1,s-1);
+}
+function draw(){
+  if(!g)return;
+  cx.clearRect(0,0,W*cell,H*cell);
+  var x,y;
+  for(y=0;y<H;y++)for(x=0;x<W;x++)if(g[y][x])block(cx,x*cell,y*cell,cell,g[y][x].c);
+  if(cur){
+    var gy=cur.y;while(fits(cur.m,cur.x,gy+1))gy++;
+    cur.m.forEach(function(r,j){r.forEach(function(v,i){if(v){
+      cx.strokeStyle='rgba(90,45,18,.35)';cx.lineWidth=2;cx.strokeRect((cur.x+i)*cell+2,(gy+j)*cell+2,cell-4,cell-4);}});});
+    cur.m.forEach(function(r,j){r.forEach(function(v,i){if(v&&cur.y+j>=0)block(cx,(cur.x+i)*cell,(cur.y+j)*cell,cell,cur.c);});});
+  }
+  nc.clearRect(0,0,128,128);var m=SH[nextN],s=26,ox=(128-m[0].length*s)/2,oy=(128-m.length*s)/2;
+  m.forEach(function(r,j){r.forEach(function(v,i){if(v)block(nc,ox+i*s,oy+j*s,s,nextN);});});
+}
+function size(){
+  cell=Math.max(14,Math.min(36,Math.floor(Math.min((innerWidth-30)/W,(innerHeight-84-104-40)/H))));
+  var d=window.devicePixelRatio||1;
+  cv.style.width=W*cell+'px';cv.style.height=H*cell+'px';cv.width=W*cell*d;cv.height=H*cell*d;cx.setTransform(d,0,0,d,0,0);
+  $('#rise').style.width=W*cell+6+'px';draw();
+}
+var last=0;
+function loop(t){
+  var dt=Math.min(100,t-last);last=t;
+  if(act()){
+    dropAcc+=dt;riseAcc+=dt;
+    if(dropAcc>=dropMs()){dropAcc=0;if(fits(cur.m,cur.x,cur.y+1))cur.y++;else lock();draw();}
+    if(riseAcc>=riseMs()){riseAcc=0;rise();draw();}
+    $('#rb').style.width=Math.min(100,riseAcc/riseMs()*100)+'%';
+  }
+  requestAnimationFrame(loop);
+}
+function pause(){if(!started||over)return;paused=!paused;$('#bp').textContent=paused?'▶':'⏸';
+  if(paused)overlay('Pausado','','Continuar');else $('#ov').classList.add('hidden');}
+$('#ob').onclick=function(){
+  $('#ov').classList.add('hidden');
+  if(paused){pause();return;}
+  started=true;reset();$('#bp').textContent='⏸';draw();
+};
+function hold(id,fn){
+  var el=$(id),tm,iv;
+  function stop(){clearTimeout(tm);clearInterval(iv);}
+  el.addEventListener('pointerdown',function(e){e.preventDefault();fn();if(id==='#bh'||id==='#bo')return;tm=setTimeout(function(){iv=setInterval(fn,id==='#bd'?50:90);},220);});
+  ['pointerup','pointerleave','pointercancel'].forEach(function(ev){el.addEventListener(ev,stop);});
+}
+hold('#bl',function(){move(-1);});hold('#br',function(){move(1);});hold('#bd',down);hold('#bo',turn);hold('#bh',hard);
+$('#bp').onclick=pause;
+cv.addEventListener('pointerdown',function(){turn();});
+document.addEventListener('keydown',function(e){
+  var k=e.key;if(k==='ArrowLeft')move(-1);else if(k==='ArrowRight')move(1);else if(k==='ArrowUp')turn();
+  else if(k==='ArrowDown')down();else if(k===' ')hard();else if(k==='p'||k==='P')pause();else return;e.preventDefault();
+});
+document.addEventListener('visibilitychange',function(){if(document.hidden&&started&&!over&&!paused)pause();});
+window.addEventListener('resize',size);
+g=empty();nextN=0;size();requestAnimationFrame(loop);
+window.__t={reset:function(){started=true;reset();},st:function(){return {g:g,cur:cur,busy:busy,over:over,settle:settle,step:step,rise:rise,hard:hard,lock:lock};}};
+})();
+</script>
+</body>
+</html>
