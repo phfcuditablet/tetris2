@@ -19,9 +19,12 @@ background:linear-gradient(90deg,#f6e6c8,#efd6ab 50%,#f6e6c8)}
 #c{border:3px solid #5a2d12;border-radius:6px;background:linear-gradient(#f8ecd2,#ecd2a2);display:block;touch-action:none}
 #rise{height:6px;background:rgba(90,45,18,.18);border-radius:3px;overflow:hidden}
 #rb{display:block;height:100%;width:0;background:#b8602a}
-#ctl{display:flex;gap:10px;padding:12px;margin-top:auto}
+#ctl{display:flex;gap:10px;padding:10px 12px;margin-top:auto}
 #ctl button{width:62px;height:62px;border:0;border-radius:16px;background:#b8602a;color:#fff;font-size:28px;box-shadow:0 4px 0 #7a3d17;cursor:pointer;touch-action:manipulation}
 #ctl button:active{transform:translateY(3px);box-shadow:0 1px 0 #7a3d17}
+footer{display:flex;justify-content:center;padding:0 0 10px}
+footer a{width:48px;height:48px;border-radius:50%;background:#5a2d12;color:#f6e6c8;font:700 26px/46px system-ui,sans-serif;text-align:center;text-decoration:none;box-shadow:0 3px 0 #2e1608}
+footer a:active{transform:translateY(2px)}
 #ov{position:fixed;inset:0;background:rgba(40,20,8,.65);display:flex;align-items:center;justify-content:center;z-index:5}
 #ov.hidden{display:none}
 #ov>div{background:#f6e6c8;padding:26px 34px;border-radius:18px;text-align:center;margin:16px}
@@ -44,9 +47,7 @@ background:linear-gradient(90deg,#f6e6c8,#efd6ab 50%,#f6e6c8)}
   <button id="bh" aria-label="Soltar tudo">⏬</button>
   <button id="bp" aria-label="Pausar">⏸</button>
 </div>
-<footer>
-  <a href="https://phfcuditablet.github.io/jogos/" aria-label="Voltar para a página dos jogos" title="Voltar">←</a>
-</footer>
+<footer><a href="https://phfcuditablet.github.io/jogos/" aria-label="Voltar para a página dos jogos" title="Voltar">←</a></footer>
 <div id="ov"><div><h2 id="ot">Blocos de Madeira</h2><p id="op">A tela começa limpa e vai subindo devagar.<br>Complete linhas antes que ela chegue ao topo!</p><button id="ob">Jogar</button></div></div>
 <script>
 (function(){
@@ -169,7 +170,7 @@ function draw(){
   m.forEach(function(r,j){r.forEach(function(v,i){if(v)block(nc,ox+i*s,oy+j*s,s,nextN);});});
 }
 function size(){
-  cell=Math.max(14,Math.min(36,Math.floor(Math.min((innerWidth-30)/W,(innerHeight-84-104-40)/H))));
+  cell=Math.max(14,Math.min(36,Math.floor(Math.min((innerWidth-30)/W,(innerHeight-84-104-40-58)/H))));
   var d=window.devicePixelRatio||1;
   cv.style.width=W*cell+'px';cv.style.height=H*cell+'px';cv.width=W*cell*d;cv.height=H*cell*d;cx.setTransform(d,0,0,d,0,0);
   $('#rise').style.width=W*cell+6+'px';draw();
